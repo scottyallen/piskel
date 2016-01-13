@@ -32,3 +32,4 @@ report
 
 # marked as private
 *.private.*
+.*.swp
