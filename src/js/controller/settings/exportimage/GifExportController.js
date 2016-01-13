@@ -8,6 +8,50 @@
   var MAGIC_PINK = '#FF00FF';
   var WHITE = '#FFFFFF';
 
+  var HEADER_TEMPLATE = (
+    '#include <FastLED.h>\n' +
+    '#include <SparkleShield.h>\n' +
+    '\n' +
+    '#define BRIGHTNESS 16\n');
+
+  var BODY_TEMPLATE = (
+    'SparkleShield sparkle;\n' +
+    'byte frame[70 * 3] = {};\n' +
+    '\n' +
+    'void loop() {\n' +
+    '  for (int i = 0; i < num_frames; i++) {\n' +
+    '    LoadFrame(frames, frame, i);\n' +
+    '    DrawFrame(frame);\n' +
+    '    sparkle.show();\n' +
+    '\n' +
+    '    delay(200);\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'void LoadFrame(const byte *frames, byte *frame, int i) {\n' +
+    '  int frame_size = kMatrixWidth * kMatrixHeight * 3;\n' +
+    '  for (int k = 0; k < kMatrixWidth * kMatrixHeight * 3; k++) {\n' +
+    '    int offset = frame_size * i + k;\n' +
+    '    frame[k] = pgm_read_byte_near(frames + offset);\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'void DrawFrame(const byte *frame) {\n' +
+    '  for (byte y = 0; y < kMatrixHeight; y++) {\n' +
+    '    for (byte x = 0; x < kMatrixWidth; x++) {\n' +
+    '      int i = (y * kMatrixWidth + x) * 3;\n' +
+    '      int red = frame[i];\n' +
+    '      int green = frame[i + 1];\n' +
+    '      int blue = frame[i + 2];\n' +
+    '      sparkle.set(kMatrixWidth - x - 1, y, CRGB(red, green, blue));\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'void setup() {\n' +
+    '  sparkle.setBrightness(BRIGHTNESS);\n' +
+    '}\n');
+
   ns.GifExportController = function (piskelController) {
     this.piskelController = piskelController;
   };
@@ -34,6 +78,7 @@
     this.heightInput = document.querySelector('.export-gif-resize-height');
     this.uploadButton = document.querySelector('.gif-upload-button');
     this.downloadButton = document.querySelector('.gif-download-button');
+    this.headerButton = document.querySelector('.header-download-button');
 
     this.sizeInputWidget = new pskl.widgets.SizeInput(
       this.widthInput, this.heightInput,
@@ -41,6 +86,7 @@
 
     this.addEventListener(this.uploadButton, 'click', this.onUploadButtonClick_);
     this.addEventListener(this.downloadButton, 'click', this.onDownloadButtonClick_);
+    this.addEventListener(this.headerButton, 'click', this.onHeaderButtonClick_);
   };
 
   ns.GifExportController.prototype.destroy = function () {
@@ -66,6 +112,20 @@
   ns.GifExportController.prototype.downloadImageData_ = function (imageData) {
     var fileName = this.piskelController.getPiskel().getDescriptor().name + '.gif';
     pskl.utils.BlobUtils.dataToBlob(imageData, 'image/gif', function(blob) {
+      pskl.utils.FileUtils.downloadAsFile(blob, fileName);
+    });
+  };
+
+  ns.GifExportController.prototype.onHeaderButtonClick_ = function (evt) {
+    var zoom = this.getZoom_();
+    var fps = this.piskelController.getFPS();
+
+    this.renderAsImageDataHeaderFile(zoom, fps, this.downloadHeaderData_.bind(this));
+  };
+
+  ns.GifExportController.prototype.downloadHeaderData_ = function (imageData) {
+    var fileName = this.piskelController.getPiskel().getDescriptor().name + '.ino';
+    pskl.utils.BlobUtils.dataToBlob(imageData, 'text/plain', function(blob) {
       pskl.utils.FileUtils.downloadAsFile(blob, fileName);
     });
   };
@@ -150,6 +210,43 @@
     }.bind(this));
 
     gif.render();
+  };
+
+  ns.GifExportController.prototype.renderAsImageDataHeaderFile = function(zoom, fps, cb) {
+    var currentColors = pskl.app.currentColorsService.getCurrentColors();
+
+    var preserveColors = currentColors.length < MAX_GIF_COLORS;
+
+    var transparentColor, transparent;
+    // transparency only supported if preserveColors is true, see Issue #357
+    if (preserveColors) {
+      transparentColor = this.getTransparentColor(currentColors);
+      transparent = parseInt(transparentColor.substring(1), 16);
+    } else {
+      transparentColor = WHITE;
+      transparent = null;
+    }
+
+    var animationData = ['const byte frames[] PROGMEM = {\n'];
+    for (var i = 0 ; i < this.piskelController.getFrameCount() ; i++) {
+      var frame = this.piskelController.getFrameAt(i);
+      var canvasRenderer = new pskl.rendering.CanvasRenderer(frame, zoom);
+      canvasRenderer.drawTransparentAs(transparentColor);
+      var canvas = canvasRenderer.render();
+      var ctx = canvas.getContext('2d');
+      var imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+      for (var j = 0; j < imageData.data.length; j += 4) {
+        animationData.push('  ',
+                           String(imageData.data[j + 0]), ', ',
+                           String(imageData.data[j + 1]), ', ',
+                           String(imageData.data[j + 2]), ', \n');
+      }
+    }
+    animationData.push('};\n');
+    animationData.push('int num_frames = ', String(this.piskelController.getFrameCount()), ';\n');
+
+    var blob = new Blob([].concat(HEADER_TEMPLATE, animationData, BODY_TEMPLATE), {'options': 'text/plain'});
+    pskl.utils.FileUtils.readFile(blob, cb);
   };
 
   ns.GifExportController.prototype.getTransparentColor = function(currentColors) {
