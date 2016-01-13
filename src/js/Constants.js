@@ -1,8 +1,8 @@
 // TODO(grosbouddha): put under pskl namespace.
 var Constants = {
   DEFAULT : {
-    HEIGHT : 32,
-    WIDTH : 32,
+    HEIGHT : 7,
+    WIDTH : 10,
     FPS : 12,
     LAYER_OPACITY : 0.2
   },
