@@ -18,16 +18,6 @@
     'SparkleShield sparkle;\n' +
     'byte frame[70 * 3] = {};\n' +
     '\n' +
-    'void loop() {\n' +
-    '  for (int i = 0; i < num_frames; i++) {\n' +
-    '    LoadFrame(frames, frame, i);\n' +
-    '    DrawFrame(frame);\n' +
-    '    sparkle.show();\n' +
-    '\n' +
-    '    delay(200);\n' +
-    '  }\n' +
-    '}\n' +
-    '\n' +
     'void LoadFrame(const byte *frames, byte *frame, int i) {\n' +
     '  int frame_size = kMatrixWidth * kMatrixHeight * 3;\n' +
     '  for (int k = 0; k < kMatrixWidth * kMatrixHeight * 3; k++) {\n' +
@@ -45,6 +35,16 @@
     '      int blue = frame[i + 2];\n' +
     '      sparkle.set(kMatrixWidth - x - 1, y, CRGB(red, green, blue));\n' +
     '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'void loop() {\n' +
+    '  for (int i = 0; i < num_frames; i++) {\n' +
+    '    LoadFrame(frames, frame, i);\n' +
+    '    DrawFrame(frame);\n' +
+    '    sparkle.show();\n' +
+    '\n' +
+    '    delay(200);\n' +
     '  }\n' +
     '}\n' +
     '\n' +
